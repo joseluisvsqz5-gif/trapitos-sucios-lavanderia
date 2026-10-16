@@ -1,15 +1,16 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Acceso | TRAPITOS SUCIOS LAVANDERÍA</title>
+  <meta name="theme-color" content="#123c35">
+  <title>TRAPITOS SUCIOS LAVANDERÍA</title>
   <style>
     * { box-sizing: border-box; }
     body {
-      margin: 0; min-height: 100vh; display: grid; place-items: center;
-      padding: 20px; font-family: Arial, sans-serif;
+      margin: 0; min-height: 100vh; padding: 20px;
+      display: grid; place-items: center;
+      font-family: Arial, sans-serif;
       background: #edf3ef; color: #20332d;
     }
     main {
@@ -18,6 +19,7 @@
       box-shadow: 0 8px 30px #163d3018;
     }
     h1 { color: #123c35; font-size: 23px; }
+    p { line-height: 1.5; }
     label { display: block; margin-top: 16px; font-weight: bold; }
     input, button {
       width: 100%; padding: 13px; margin-top: 7px;
@@ -26,108 +28,89 @@
     input { border: 1px solid #b8c8bf; }
     button {
       border: 0; background: #176b55; color: white;
-      font-weight: bold; margin-top: 22px;
+      font-weight: bold; cursor: pointer; margin-top: 20px;
     }
-    #mensaje { white-space: pre-wrap; line-height: 1.5; }
-    .nota { color: #5a6d63; font-size: 13px; }
+    button:disabled { opacity: .6; }
+    #mensaje { overflow-wrap: anywhere; }
+    .nota { font-size: 13px; color: #52665d; }
   </style>
 </head>
 <body>
   <main>
     <h1>TRAPITOS SUCIOS LAVANDERÍA</h1>
-    <p>Acceso privado de administración</p>
+    <p>Acceso exclusivo para el administrador</p>
 
     <form id="login">
-      <label for="email">Correo del administrador</label>
-      <input id="email" type="email" autocomplete="username"
+      <label for="correo">Correo electrónico</label>
+      <input id="correo" type="email" autocomplete="username"
         required>
-      <label for="password">Contraseña</label>
-      <input id="password" type="password"
+
+      <label for="clave">Contraseña</label>
+      <input id="clave" type="password"
         autocomplete="current-password" required>
+
       <button id="entrar" type="submit">Iniciar sesión</button>
     </form>
 
-    <p id="mensaje" role="status"></p>
-    <p class="nota">Solo pueden entrar las cuentas autorizadas.</p>
-    <button id="salir" type="button" hidden>Cerrar sesión</button>
+    <p id="mensaje" role="status" aria-live="polite"></p>
+    <p class="nota">Acceso restringido a personal autorizado.</p>
   </main>
 
   <script type="module">
     import { createClient } from
       'https://esm.sh/@supabase/supabase-js@2';
 
-    const SUPABASE_URL = 'https://joseluisvsqz5-gif.github.io/trapitos-sucios-lavanderia/';
+    const SUPABASE_URL = 'https://esm.sh/@supabase/supabase-js@2';
     const SUPABASE_KEY = 'sb_publishable_j4olSF8Jc4PEhu9G9w1JSw_x07QrVw4';
 
-    const mensaje = document.querySelector('#mensaje');
-    const formulario = document.querySelector('#login');
-    const boton = document.querySelector('#entrar');
-    const salir = document.querySelector('#salir');
+    const supabase = createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
 
-    const configurado =
-      SUPABASE_URL.startsWith('https://') &&
-      SUPABASE_KEY.startsWith('sb_publishable_') &&
-      !SUPABASE_URL.includes('PEGA_AQUI') &&
-      !SUPABASE_KEY.includes('PEGA_AQUI');
+    const form = document.getElementById('login');
+    const mensaje = document.getElementById('mensaje');
+    const boton = document.getElementById('entrar');
 
-    if (!configurado) {
-      mensaje.textContent =
-        'Falta configurar la URL y la clave publicable de Supabase.';
+    form.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
       boton.disabled = true;
-    } else {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+      mensaje.textContent = 'Verificando acceso...';
 
-      formulario.addEventListener('submit', async (evento) => {
-        evento.preventDefault();
-        boton.disabled = true;
-        mensaje.textContent = 'Verificando acceso…';
+      try {
+        const email = document.getElementById('correo').value.trim();
+        const password = document.getElementById('clave').value;
 
-        const { error } = await supabase.auth.signInWithPassword({
-          email: document.querySelector('#email').value.trim(),
-          password: document.querySelector('#password').value
-        });
+        const { error: loginError } =
+          await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
 
-        if (error) {
-          mensaje.textContent =
-            'No se pudo iniciar sesión. Revisa el correo y la contraseña.';
-        } else {
-          formulario.hidden = true;
-          salir.hidden = false;
-          mensaje.textContent =
-            'Sesión iniciada. Verificando autorización administrativa…';
-
-          const { data: esAdmin, error: errorAdmin } =
-            await supabase.rpc('is_admin');
-
-          if (errorAdmin || esAdmin !== true) {
-            await supabase.auth.signOut();
-            formulario.hidden = false;
-            salir.hidden = true;
-            mensaje.textContent =
-              'Esta cuenta no tiene autorización administrativa.';
-          } else {
-            mensaje.textContent =
-              'Acceso administrativo confirmado. El panel de gestión se añadirá en el siguiente paso.';
-          }
+        if (loginError) {
+          throw new Error('No se pudo iniciar sesión. Revisa tu correo y contraseña.');
         }
-        boton.disabled = false;
-      });
 
-      salir.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        formulario.hidden = false;
-        salir.hidden = true;
-        mensaje.textContent = 'Sesión cerrada.';
-      });
+        const { data: esAdmin, error: adminError } =
+          await supabase.rpc('is_admin');
 
-      const { data: { session } } =
-        await supabase.auth.getSession();
+        if (adminError || esAdmin !== true) {
+          await supabase.auth.signOut();
+          throw new Error(
+            'Acceso administrativo no confirmado. Revisa la configuración de permisos.'
+          );
+        }
 
-      if (session) {
+        form.hidden = true;
         mensaje.textContent =
-          'Ya existe una sesión. Inicia sesión nuevamente para verificar el acceso.';
+          'Acceso administrativo confirmado. El siguiente paso será crear el panel de gestión.';
+      } catch (error) {
+        mensaje.textContent = error.message ||
+          'Ocurrió un error. Inténtalo nuevamente.';
+      } finally {
+        boton.disabled = false;
       }
-    }
+    });
   </script>
 </body>
 </html>
